@@ -1,0 +1,17 @@
+{
+  "pluginAlias": "AirQualitySensor",
+  "pluginType": "accessory",
+  "schema": {
+    "name": {
+      "title": "Name",
+      "type": "string",
+      "placeholder": "Name",
+      "default": "Air Quality Sensor"
+    },
+    "api_endpoint": {
+      "title": "API Endpoint",
+      "type": "string",
+      "placeholder": "http://example.com:5555/report.json"
+    }
+  }
+}
