@@ -11,7 +11,32 @@
     "api_endpoint": {
       "title": "API Endpoint",
       "type": "string",
-      "placeholder": "http://example.com:5555/report.json"
+      "placeholder": "http://example.com:5555/report.json",
+      "required": true
+    },
+    "features": {
+      "title": "Optional features to enable",
+      "type": "object",
+      "properties": {
+        "aqi": {
+          "title": "Air Quality",
+          "type": "boolean",
+          "default": "false"
+        },
+        "voc": {
+          "title": "Volatile Organic Compounds Measurement",
+          "type": "boolean",
+          "default": "false",
+          "condition": {
+            "functionBody": "return model.features.aqi === true;"
+          }
+        },
+        "co2": {
+          "title": "Carbon Dioxide (equivalents) Measurement",
+          "type": "boolean",
+          "default": "false"
+        }
+      }
     }
   }
 }
