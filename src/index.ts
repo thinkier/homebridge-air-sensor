@@ -11,12 +11,16 @@ import {
 import {Config} from "./config";
 import fetch from "node-fetch";
 
+interface CachedData {
+    co2_ppm_peak?: number
+}
+
 interface SensorReport {
-    air_quality: number,
-    gas_resistance: number,
-    temp: number,
+    temperature: number,
     humidity: number,
-    pressure: number
+    air_quality?: number,
+    voc_ppm?: number,
+    co2_ppm?: number,
 }
 
 let hap: HAP;
@@ -33,9 +37,10 @@ class AirQualitySensor implements AccessoryPlugin {
     private readonly tempsService: Service;
     private readonly humidityService: Service;
     private readonly airQualityService: Service;
+    private readonly co2Service: Service;
 
-    private lastFetch: number = 0;
     private data: SensorReport | undefined;
+    private cache: CachedData = {};
 
     constructor(private readonly log: Logging, private readonly config: Config, api: API) {
         this.name = config.name;
@@ -48,7 +53,7 @@ class AirQualitySensor implements AccessoryPlugin {
         this.tempsService.getCharacteristic(hap.Characteristic.CurrentTemperature)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 callback(!this.data ? HAPStatus.OPERATION_TIMED_OUT : undefined,
-                    this.data?.temp);
+                    this.data?.temperature);
             })
 
         this.humidityService = new hap.Service.HumiditySensor(this.name);
@@ -62,7 +67,31 @@ class AirQualitySensor implements AccessoryPlugin {
         this.airQualityService.getCharacteristic(hap.Characteristic.AirQuality)
             .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                 callback(!this.data ? HAPStatus.OPERATION_TIMED_OUT : undefined,
-                    Math.round(this.data?.air_quality ?? 0));
+                    this.data?.air_quality);
+            });
+        this.airQualityService.getCharacteristic(hap.Characteristic.VOCDensity)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(!this.data?.voc_ppm ? HAPStatus.RESOURCE_DOES_NOT_EXIST : undefined,
+                    this.data?.voc_ppm);
+            })
+
+        this.co2Service = new hap.Service.CarbonDioxideSensor(this.name);
+        this.co2Service.getCharacteristic(hap.Characteristic.CarbonDioxideDetected)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(!this.data?.co2_ppm ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                    this.data?.co2_ppm > 1000 ?
+                        hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_ABNORMAL :
+                        hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL)
+            })
+        this.co2Service.getCharacteristic(hap.Characteristic.CarbonDioxideLevel)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(!this.data?.co2_ppm ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                    this.data?.co2_ppm)
+            })
+        this.co2Service.getCharacteristic(hap.Characteristic.CarbonDioxidePeakLevel)
+            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                callback(!this.cache?.co2_ppm_peak ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                    this.cache?.co2_ppm_peak)
             })
 
         setInterval(this.retrieveSensorData, 5e3);
@@ -78,6 +107,10 @@ class AirQualitySensor implements AccessoryPlugin {
 
             this.data = await fetch(this.config.api_endpoint)
                 .then(x => x.json()) as SensorReport;
+
+            if (this.data.co2_ppm && (!this.cache.co2_ppm_peak || this.data.co2_ppm > this.cache.co2_ppm_peak)) {
+                this.cache.co2_ppm_peak = this.data.co2_ppm
+            }
         } catch (ex) {
             this.log.error(`Failed to retrieve sensor data: ${ex}`);
         }
@@ -88,7 +121,8 @@ class AirQualitySensor implements AccessoryPlugin {
             this.informationService,
             this.tempsService,
             this.humidityService,
-            this.airQualityService
+            this.airQualityService,
+            this.co2Service
         ];
     }
 }
