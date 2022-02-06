@@ -85,9 +85,7 @@ class AirQualitySensor implements AccessoryPlugin {
             this.co2Service.getCharacteristic(hap.Characteristic.CarbonDioxideDetected)
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                     callback(!this.data?.co2_ppm ? HAPStatus.OPERATION_TIMED_OUT : undefined,
-                        this.data?.co2_ppm > 1000 ?
-                            hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_ABNORMAL :
-                            hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL)
+                        this.co2_detected())
                 })
             this.co2Service.getCharacteristic(hap.Characteristic.CarbonDioxideLevel)
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -101,7 +99,10 @@ class AirQualitySensor implements AccessoryPlugin {
                 })
         }
 
-        setInterval(this.retrieveSensorData, 5e3);
+        setInterval(async () => {
+            await this.retrieveSensorData();
+            this.updateCharacteristics(config);
+        }, 5e3);
 
         log.info("Sensor finished initializing!");
     }
@@ -131,5 +132,35 @@ class AirQualitySensor implements AccessoryPlugin {
             this.airQualityService,
             this.co2Service
         ].filter(x => x !== undefined);
+    }
+
+    private updateCharacteristics(config: Config) {
+        if (this.data.temperature) {
+            this.tempsService.updateCharacteristic(hap.Characteristic.CurrentTemperature, this.data.temperature);
+        }
+        if (this.data.humidity) {
+            this.humidityService.updateCharacteristic(hap.Characteristic.CurrentRelativeHumidity, this.data.humidity);
+        }
+        if (config.features.aqi) {
+            if (this.data.air_quality) {
+                this.airQualityService.updateCharacteristic(hap.Characteristic.AirQuality, this.data.air_quality);
+            }
+            if (this.data.voc_ppm && config.features.voc) {
+                this.airQualityService.updateCharacteristic(hap.Characteristic.VOCDensity, this.data.voc_ppm);
+            }
+        }
+        if (config.features.co2) {
+            if (this.data.co2_ppm) {
+                this.co2Service.updateCharacteristic(hap.Characteristic.CarbonDioxideDetected, this.co2_detected());
+                this.co2Service.updateCharacteristic(hap.Characteristic.CarbonDioxideLevel, this.data.co2_ppm);
+                this.co2Service.updateCharacteristic(hap.Characteristic.CarbonDioxidePeakLevel, this.cache.co2_ppm_peak);
+            }
+        }
+    }
+
+    co2_detected = () => {
+        return this.data?.co2_ppm > 1000 ?
+            hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_ABNORMAL :
+            hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL
     }
 }
