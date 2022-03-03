@@ -100,8 +100,9 @@ class AirQualitySensor implements AccessoryPlugin {
         }
 
         setInterval(async () => {
-            await this.retrieveSensorData();
-            this.updateCharacteristics(config);
+            if (await this.retrieveSensorData()) {
+                this.updateCharacteristics(config);
+            }
         }, 5e3);
 
         log.info("Sensor finished initializing!");
@@ -119,9 +120,13 @@ class AirQualitySensor implements AccessoryPlugin {
             if (this.data.co2_ppm && (!this.cache.co2_ppm_peak || this.data.co2_ppm > this.cache.co2_ppm_peak)) {
                 this.cache.co2_ppm_peak = this.data.co2_ppm
             }
+
+            return true;
         } catch (ex) {
-            this.log.error(`Failed to retrieve sensor data: ${ex}`);
+            this.log.warn(`Failed to retrieve sensor data: ${ex}`);
         }
+
+        return false;
     }
 
     getServices(): Service[] {
