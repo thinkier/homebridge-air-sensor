@@ -141,10 +141,10 @@ class AirQualitySensor implements AccessoryPlugin {
                 this.log.error("API Endpoint of the sensor is not defined!")
             }
             const url = new URL(this.config.api_endpoint);
-            if (url.protocol === "http") {
+            if (url.protocol === "http:") {
                 this.data = await fetch(this.config.api_endpoint)
                     .then(x => x.json()) as SensorReport;
-            } else if (url.protocol === "udp") {
+            } else if (url.protocol === "udp:") {
                 // TODO Implement UDP fetch
                 this.data = await new Promise((res, rej) => {
                     let sock = dgram.createSocket("udp4", (msg, rinfo) => {
