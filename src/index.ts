@@ -9,17 +9,20 @@ import {
     Service
 } from "homebridge";
 import {Config} from "./config";
+import dgram from "node:dgram";
 import fetch from "node-fetch";
 
 interface CachedData {
+    co_ppm_peak?: number
     co2_ppm_peak?: number
 }
 
 interface SensorReport {
-    temperature: number,
-    humidity: number,
+    temperature?: number,
+    humidity?: number,
     air_quality?: number,
     voc_ppm?: number,
+    co_ppm?: number,
     co2_ppm?: number,
 }
 
@@ -34,9 +37,10 @@ class AirQualitySensor implements AccessoryPlugin {
     private readonly name: string;
     private readonly informationService: Service;
 
-    private readonly tempsService: Service;
-    private readonly humidityService: Service;
+    private readonly tempsService: Service | undefined;
+    private readonly humidityService: Service | undefined;
     private readonly airQualityService: Service | undefined;
+    private readonly coService: Service | undefined;
     private readonly co2Service: Service | undefined;
 
     private data: SensorReport | undefined;
@@ -50,19 +54,23 @@ class AirQualitySensor implements AccessoryPlugin {
 
         log.info(`Creating sensor with the following extra features: ${JSON.stringify(config.features)}`)
 
-        this.tempsService = new hap.Service.TemperatureSensor(this.name);
-        this.tempsService.getCharacteristic(hap.Characteristic.CurrentTemperature)
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                callback(!this.data ? HAPStatus.OPERATION_TIMED_OUT : undefined,
-                    this.data?.temperature);
-            })
+        if (config.features.temperature !== false) {
+            this.tempsService = new hap.Service.TemperatureSensor(this.name);
+            this.tempsService.getCharacteristic(hap.Characteristic.CurrentTemperature)
+                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    callback(!this.data ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                        this.data?.temperature);
+                })
+        }
 
-        this.humidityService = new hap.Service.HumiditySensor(this.name);
-        this.humidityService.getCharacteristic(hap.Characteristic.CurrentRelativeHumidity)
-            .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
-                callback(!this.data ? HAPStatus.OPERATION_TIMED_OUT : undefined,
-                    this.data?.humidity);
-            })
+        if (config.features.humidity !== false) {
+            this.humidityService = new hap.Service.HumiditySensor(this.name);
+            this.humidityService.getCharacteristic(hap.Characteristic.CurrentRelativeHumidity)
+                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    callback(!this.data ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                        this.data?.humidity);
+                })
+        }
 
         if (config.features?.aqi) {
             this.airQualityService = new hap.Service.AirQualitySensor(this.name);
@@ -78,6 +86,25 @@ class AirQualitySensor implements AccessoryPlugin {
                             this.data?.voc_ppm);
                     })
             }
+        }
+
+        if (config.features?.co) {
+            this.co2Service = new hap.Service.CarbonMonoxideSensor(this.name);
+            this.co2Service.getCharacteristic(hap.Characteristic.CarbonMonoxideDetected)
+                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    callback(!this.data?.co_ppm ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                        this.co_detected())
+                })
+            this.co2Service.getCharacteristic(hap.Characteristic.CarbonMonoxideLevel)
+                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    callback(!this.data?.co_ppm ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                        this.data?.co_ppm)
+                })
+            this.co2Service.getCharacteristic(hap.Characteristic.CarbonMonoxidePeakLevel)
+                .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                    callback(!this.cache?.co_ppm_peak ? HAPStatus.OPERATION_TIMED_OUT : undefined,
+                        this.cache?.co_ppm_peak)
+                })
         }
 
         if (config.features?.co2) {
@@ -113,10 +140,27 @@ class AirQualitySensor implements AccessoryPlugin {
             if (!this.config.api_endpoint) {
                 this.log.error("API Endpoint of the sensor is not defined!")
             }
+            const url = new URL(this.config.api_endpoint);
+            if (url.protocol === "http") {
+                this.data = await fetch(this.config.api_endpoint)
+                    .then(x => x.json()) as SensorReport;
+            } else if (url.protocol === "udp") {
+                // TODO Implement UDP fetch
+                this.data = JSON.parse(await new Promise((res, rej) => {
+                    let sock = dgram.createSocket("udp4", (msg, rinfo) => {
+                        if (rinfo.address === url.host) {
+                            res(msg.toString("utf8"));
+                            sock.close();
+                        }
+                    });
+                    sock.bind();
+                    sock.send("", Number.parseInt(url.port, 10), url.host);
+                }));
+            }
 
-            this.data = await fetch(this.config.api_endpoint)
-                .then(x => x.json()) as SensorReport;
-
+            if (this.data.co_ppm && (!this.cache.co_ppm_peak || this.data.co_ppm > this.cache.co_ppm_peak)) {
+                this.cache.co_ppm_peak = this.data.co_ppm
+            }
             if (this.data.co2_ppm && (!this.cache.co2_ppm_peak || this.data.co2_ppm > this.cache.co2_ppm_peak)) {
                 this.cache.co2_ppm_peak = this.data.co2_ppm
             }
@@ -135,6 +179,7 @@ class AirQualitySensor implements AccessoryPlugin {
             this.tempsService,
             this.humidityService,
             this.airQualityService,
+            this.coService,
             this.co2Service
         ].filter(x => x !== undefined);
     }
@@ -161,6 +206,12 @@ class AirQualitySensor implements AccessoryPlugin {
                 this.co2Service.updateCharacteristic(hap.Characteristic.CarbonDioxidePeakLevel, this.cache.co2_ppm_peak);
             }
         }
+    }
+
+    co_detected = () => {
+        return this.data?.co2_ppm > 2 ?
+            hap.Characteristic.CarbonMonoxideDetected.CO_LEVELS_ABNORMAL :
+            hap.Characteristic.CarbonMonoxideDetected.CO_LEVELS_NORMAL
     }
 
     co2_detected = () => {

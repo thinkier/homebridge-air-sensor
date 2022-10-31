@@ -15,24 +15,39 @@
       "required": true
     },
     "features": {
-      "title": "Optional features to enable",
+      "title": "Features to enable",
       "type": "object",
       "properties": {
+        "temperature": {
+          "title": "Temperature (C)",
+          "type": "boolean",
+          "default": "true"
+        },
+        "humidity": {
+          "title": "Humidity (%RH)",
+          "type": "boolean",
+          "default": "true"
+        },
         "aqi": {
-          "title": "Air Quality",
+          "title": "Air Quality (1-5)",
           "type": "boolean",
           "default": "false"
         },
         "voc": {
-          "title": "Volatile Organic Compounds Measurement",
+          "title": "Volatile Organic Compounds Measurement (ppm)",
           "type": "boolean",
           "default": "false",
           "condition": {
             "functionBody": "return model.features.aqi === true;"
           }
         },
+        "co": {
+          "title": "Carbon Monoxide Measurement (ppm)",
+          "type": "boolean",
+          "default": "false"
+        },
         "co2": {
-          "title": "Carbon Dioxide (equivalents) Measurement",
+          "title": "Carbon Dioxide (or equivalents) Measurement (ppm)",
           "type": "boolean",
           "default": "false"
         }
