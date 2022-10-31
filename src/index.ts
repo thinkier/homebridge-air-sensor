@@ -42,7 +42,7 @@ class AirQualitySensor implements AccessoryPlugin {
 
     private udp_socket: dgram.Socket = undefined;
     private last_updated = 0;
-    private data: SensorReport | undefined;
+    private data: SensorReport = {};
 
     constructor(private readonly log: Logging, private readonly config: Config, api: API) {
         this.name = config.name;
@@ -147,7 +147,7 @@ class AirQualitySensor implements AccessoryPlugin {
                             this.last_updated = Date.now();
                         });
                         this.udp_socket.bind(Number.parseInt(url.port, 10));
-                        console.log("Listening to the accessory on", url.port)
+                        this.log.info("Listening to the accessory on", url.port)
                     }
                 } else {
                     this.data = await new Promise((res, rej) => {
@@ -163,7 +163,7 @@ class AirQualitySensor implements AccessoryPlugin {
                     this.last_updated = Date.now();
                 }
             } else {
-                console.error("Unknown protocol", url.protocol, "for sensor", this.name);
+                this.log.error("Unknown protocol", url.protocol, "for sensor", this.name);
                 return false;
             }
 
@@ -252,7 +252,7 @@ class AirQualitySensor implements AccessoryPlugin {
             return undefined;
         }
 
-        return this.data?.co2_ppm > 1000 ?
+        return this.data?.co2_ppm > 2000 ?
             hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_ABNORMAL :
             hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL
     }
