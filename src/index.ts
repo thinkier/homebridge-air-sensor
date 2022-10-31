@@ -146,22 +146,22 @@ class AirQualitySensor implements AccessoryPlugin {
                     .then(x => x.json()) as SensorReport;
             } else if (url.protocol === "udp") {
                 // TODO Implement UDP fetch
-                this.data = JSON.parse(await new Promise((res, rej) => {
+                this.data = await new Promise((res, rej) => {
                     let sock = dgram.createSocket("udp4", (msg, rinfo) => {
                         if (rinfo.address === url.host) {
-                            res(msg.toString("utf8"));
+                            res(JSON.parse(msg.toString("utf8")));
                             sock.close();
                         }
                     });
                     sock.bind();
                     sock.send("", Number.parseInt(url.port, 10), url.host);
-                }));
+                });
             }
 
-            if (this.data.co_ppm && (!this.cache.co_ppm_peak || this.data.co_ppm > this.cache.co_ppm_peak)) {
+            if ("co_ppm" in this.data && (!this.cache.co_ppm_peak || this.data.co_ppm > this.cache.co_ppm_peak)) {
                 this.cache.co_ppm_peak = this.data.co_ppm
             }
-            if (this.data.co2_ppm && (!this.cache.co2_ppm_peak || this.data.co2_ppm > this.cache.co2_ppm_peak)) {
+            if ("co2_ppm" in this.data && (!this.cache.co2_ppm_peak || this.data.co2_ppm > this.cache.co2_ppm_peak)) {
                 this.cache.co2_ppm_peak = this.data.co2_ppm
             }
 
