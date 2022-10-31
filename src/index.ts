@@ -83,13 +83,13 @@ class AirQualitySensor implements AccessoryPlugin {
         }
 
         if (config.features?.co) {
-            this.co2Service = new hap.Service.CarbonMonoxideSensor(this.name);
-            this.co2Service.getCharacteristic(hap.Characteristic.CarbonMonoxideDetected)
+            this.coService = new hap.Service.CarbonMonoxideSensor(this.name);
+            this.coService.getCharacteristic(hap.Characteristic.CarbonMonoxideDetected)
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                     this.callback(callback, this.co_detected())
                 })
             if (config.features.co_ppm) {
-                this.co2Service.getCharacteristic(hap.Characteristic.CarbonMonoxideLevel)
+                this.coService.getCharacteristic(hap.Characteristic.CarbonMonoxideLevel)
                     .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                         this.callback(callback, this.data?.co_ppm)
                     })
@@ -208,10 +208,10 @@ class AirQualitySensor implements AccessoryPlugin {
         if (config.features.co) {
             let co_detected = this.co_detected();
             if (co_detected !== undefined) {
-                this.coService.updateCharacteristic(hap.Characteristic.CarbonDioxideDetected, co_detected);
+                this.coService.updateCharacteristic(hap.Characteristic.CarbonMonoxideDetected, co_detected);
             }
             if (this.data.co_ppm) {
-                this.coService.updateCharacteristic(hap.Characteristic.CarbonDioxideLevel, this.data.co_ppm);
+                this.coService.updateCharacteristic(hap.Characteristic.CarbonMonoxideLevel, this.data.co_ppm);
             }
         }
         if (config.features.co2) {
