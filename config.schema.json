@@ -42,14 +42,30 @@
           }
         },
         "co": {
-          "title": "Carbon Monoxide Measurement (ppm)",
+          "title": "Carbon Monoxide Detection",
           "type": "boolean",
           "default": "false"
         },
+        "co_ppm": {
+          "title": "Carbon Monoxide Measurement (ppm)",
+          "type": "boolean",
+          "default": "false",
+          "condition": {
+            "functionBody": "return model.features.co === true;"
+          }
+        },
         "co2": {
-          "title": "Carbon Dioxide (or equivalents) Measurement (ppm)",
+          "title": "Carbon Dioxide Detection",
           "type": "boolean",
           "default": "false"
+        },
+        "co2_ppm": {
+          "title": "Carbon Dioxide Measurement (ppm)",
+          "type": "boolean",
+          "default": "false",
+          "condition": {
+            "functionBody": "return model.features.co2 === true;"
+          }
         }
       }
     }

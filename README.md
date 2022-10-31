@@ -9,11 +9,12 @@ This plugin is designed to interact with an external API, [such as this one I ma
     - Humidity
     - Air Quality Index (1-5)
     - Volatile Organic Compounds (ppm)
-    - Carbon Dioxide (ppm)
+    - Carbon Monoxide (detected + ppm)
+    - Carbon Dioxide (detected + ppm)
 
 ## Example Config
 
-```json
+```js
 {
   // ...
   "accessories": [
@@ -23,7 +24,7 @@ This plugin is designed to interact with an external API, [such as this one I ma
       "features": {
         "aqi": true,
         "voc": true,
-        "co2": true
+        "co2": false
       },
       "accessory": "AirQualitySensor"
     }

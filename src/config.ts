@@ -8,6 +8,8 @@ export interface Config extends AccessoryConfig {
         aqi?: boolean,
         voc?: boolean,
         co?: boolean,
+        co_ppm?: boolean,
         co2?: boolean
+        co2_ppm?: boolean,
     }
 }
