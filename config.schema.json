@@ -14,6 +14,12 @@
       "placeholder": "http://example.com:5555/report.json",
       "required": true
     },
+    "timeout": {
+      "title": "Timeout (seconds)",
+      "type": "number",
+      "placeholder": "30",
+      "required": true
+    },
     "features": {
       "title": "Features to enable",
       "type": "object",

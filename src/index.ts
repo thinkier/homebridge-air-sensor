@@ -51,7 +51,7 @@ class AirQualitySensor implements AccessoryPlugin {
         this.informationService = new hap.Service.AccessoryInformation()
             .setCharacteristic(hap.Characteristic.Manufacturer, "ACME Pty Ltd");
 
-        this.timeout = config.timeout ?? 30e3;
+        this.timeout = (config.timeout ?? 30) * 1e3;
 
         log.info(`Creating sensor with the following extra features: ${JSON.stringify(config.features)}`)
 
