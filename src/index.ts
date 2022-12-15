@@ -33,6 +33,7 @@ export = (api: API) => {
 class AirQualitySensor implements AccessoryPlugin {
     private readonly name: string;
     private readonly informationService: Service;
+    private readonly timeout: number;
 
     private readonly tempsService: Service | undefined;
     private readonly humidityService: Service | undefined;
@@ -49,6 +50,8 @@ class AirQualitySensor implements AccessoryPlugin {
 
         this.informationService = new hap.Service.AccessoryInformation()
             .setCharacteristic(hap.Characteristic.Manufacturer, "ACME Pty Ltd");
+
+        this.timeout = config.timeout ?? 30e3;
 
         log.info(`Creating sensor with the following extra features: ${JSON.stringify(config.features)}`)
 
@@ -120,7 +123,7 @@ class AirQualitySensor implements AccessoryPlugin {
     }
 
     callback = (cb: CharacteristicGetCallback, value: any) => {
-        if (Date.now() - this.last_updated > 30e3) {
+        if (Date.now() - this.last_updated > this.timeout) {
             cb(HAPStatus.OPERATION_TIMED_OUT)
         } else if (value === undefined) {
             cb(HAPStatus.RESOURCE_DOES_NOT_EXIST);

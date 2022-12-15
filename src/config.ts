@@ -2,6 +2,7 @@ import {AccessoryConfig} from "homebridge";
 
 export interface Config extends AccessoryConfig {
     api_endpoint: string,
+    timeout?: number,
     features?: {
         temperature?: boolean,
         humidity?: boolean,
