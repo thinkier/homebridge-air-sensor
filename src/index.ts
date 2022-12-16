@@ -11,6 +11,7 @@ import {
 import {Config} from "./config";
 import dgram from "node:dgram";
 import fetch from "node-fetch";
+import http from "node:http";
 
 interface SensorReport {
     temperature?: number,
@@ -21,6 +22,7 @@ interface SensorReport {
     co_ppm?: number,
     co2_detected?: boolean
     co2_ppm?: number,
+    readings?: Record<string, number | string | boolean>
 }
 
 let hap: HAP;
@@ -41,6 +43,7 @@ class AirQualitySensor implements AccessoryPlugin {
     private readonly coService: Service | undefined;
     private readonly co2Service: Service | undefined;
 
+    private http_server: http.Server = undefined;
     private udp_socket: dgram.Socket = undefined;
     private last_updated = 0;
     private data: SensorReport = {};
@@ -139,18 +142,49 @@ class AirQualitySensor implements AccessoryPlugin {
             }
             const url = new URL(this.config.api_endpoint);
             if (url.protocol === "http:") {
-                this.data = await fetch(this.config.api_endpoint)
-                    .then(x => x.json()) as SensorReport;
-                this.last_updated = Date.now();
+                if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
+                    if (this.http_server === undefined) {
+                        this.http_server = http.createServer((req, res) => {
+                            if (["POST", "PUT"].indexOf(req.method) < 0 || ["application/json", "text/json"].indexOf(req.headers["content-type"]) < 0) {
+                                res.statusCode = 400;
+                                res.end("Only accepts JSON POST/PUT");
+                                this.log.error(`Bad request from ${req.socket.remoteAddress}:${req.socket.remotePort}`)
+                                return;
+                            }
+
+                            let buf = "";
+                            req.setEncoding("utf8");
+                            req.on("data", _ => {
+                                buf += req.read();
+                            })
+                            this.log.info(buf);
+                            req.on("end", _ => {
+                                this.data = JSON.parse(buf);
+                                this.normalizeData();
+                                this.last_updated = Date.now();
+                                this.log.info(`Accepted new data from ${req.socket.remoteAddress}:${req.socket.remotePort}`)
+                            })
+                        });
+                        this.http_server.listen(Number.parseInt(url.port, 10));
+                        this.log.info("Listening to HTTP accessory on", url.port)
+                    }
+                } else {
+                    this.data = await fetch(this.config.api_endpoint)
+                        .then(x => x.json()) as SensorReport;
+                    this.normalizeData();
+                    this.last_updated = Date.now();
+                }
             } else if (url.protocol === "udp:") {
                 if (url.hostname === "localhost" || url.hostname === "127.0.0.1") {
                     if (this.udp_socket === undefined) {
                         this.udp_socket = dgram.createSocket("udp4", (msg, rinfo) => {
                             this.data = JSON.parse(msg.toString("utf8"));
+                            this.normalizeData();
                             this.last_updated = Date.now();
+                            this.log.info(`Accepted new data from ${rinfo.address}:${rinfo.port}`)
                         });
                         this.udp_socket.bind(Number.parseInt(url.port, 10));
-                        this.log.info("Listening to the accessory on", url.port)
+                        this.log.info("Listening to UDP accessory on", url.port)
                     }
                 } else {
                     this.data = await new Promise((res, rej) => {
@@ -163,6 +197,7 @@ class AirQualitySensor implements AccessoryPlugin {
                         sock.bind();
                         sock.send("", Number.parseInt(url.port, 10), url.hostname);
                     });
+                    this.normalizeData();
                     this.last_updated = Date.now();
                 }
             } else {
@@ -176,6 +211,13 @@ class AirQualitySensor implements AccessoryPlugin {
         }
 
         return false;
+    }
+
+    normalizeData = () => {
+        if (this.data && "readings" in this.data && typeof this.data.readings === "object") {
+            this.data = {...this.data, ...this.data.readings};
+            delete this.data.readings;
+        }
     }
 
     getServices(): Service[] {
