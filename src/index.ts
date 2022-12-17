@@ -82,6 +82,21 @@ class AirQualitySensor implements AccessoryPlugin {
                 .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
                     this.callback(callback, this.data?.air_quality);
                 });
+
+            if (config.features?.pm10) {
+                this.airQualityService.getCharacteristic(hap.Characteristic.PM10Density)
+                    .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                        this.callback(callback, this.data?.pm10);
+                    })
+            }
+
+            if (config.features?.pm2_5) {
+                this.airQualityService.getCharacteristic(hap.Characteristic.PM2_5Density)
+                    .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
+                        this.callback(callback, this.data?.pm2_5);
+                    })
+            }
+
             if (config.features?.voc) {
                 this.airQualityService.getCharacteristic(hap.Characteristic.VOCDensity)
                     .on(CharacteristicEventTypes.GET, (callback: CharacteristicGetCallback) => {
@@ -120,6 +135,7 @@ class AirQualitySensor implements AccessoryPlugin {
 
         setInterval(async () => {
             if (await this.retrieveSensorData()) {
+                this.normalizeData();
                 this.updateCharacteristics(config);
             }
         }, 5e3);
@@ -162,7 +178,6 @@ class AirQualitySensor implements AccessoryPlugin {
                             this.log.info(buf);
                             req.on("end", _ => {
                                 this.data = JSON.parse(buf);
-                                this.normalizeData();
                                 this.last_updated = Date.now();
                                 this.log.info(`Accepted new data from ${req.socket.remoteAddress}:${req.socket.remotePort}`)
                             })
@@ -173,7 +188,6 @@ class AirQualitySensor implements AccessoryPlugin {
                 } else {
                     this.data = await fetch(this.config.api_endpoint)
                         .then(x => x.json()) as SensorReport;
-                    this.normalizeData();
                     this.last_updated = Date.now();
                 }
             } else if (url.protocol === "udp:") {
@@ -181,7 +195,6 @@ class AirQualitySensor implements AccessoryPlugin {
                     if (this.udp_socket === undefined) {
                         this.udp_socket = dgram.createSocket("udp4", (msg, rinfo) => {
                             this.data = JSON.parse(msg.toString("utf8"));
-                            this.normalizeData();
                             this.last_updated = Date.now();
                             this.log.info(`Accepted new data from ${rinfo.address}:${rinfo.port}`)
                         });
@@ -199,7 +212,6 @@ class AirQualitySensor implements AccessoryPlugin {
                         sock.bind();
                         sock.send("", Number.parseInt(url.port, 10), url.hostname);
                     });
-                    this.normalizeData();
                     this.last_updated = Date.now();
                 }
             } else {
@@ -219,6 +231,10 @@ class AirQualitySensor implements AccessoryPlugin {
         if (this.data && "readings" in this.data && typeof this.data.readings === "object") {
             this.data = {...this.data, ...this.data.readings};
             delete this.data.readings;
+
+            if (this.config.features.aqi && this.config.features.pm10 && typeof this.data.air_quality !== "number") {
+                this.data.air_quality = pm10ToAqi(this.data.pm10);
+            }
         }
     }
 
@@ -251,10 +267,6 @@ class AirQualitySensor implements AccessoryPlugin {
 
             if (config.features.pm10 && typeof this.data.pm10 === "number") {
                 this.airQualityService.updateCharacteristic(hap.Characteristic.PM10Density, this.data.pm10);
-
-                if (!this.data.air_quality) {
-                    this.airQualityService.updateCharacteristic(hap.Characteristic.AirQuality, pm10ToAqi(this.data.pm10));
-                }
             }
 
             if (config.features.pm2_5 && typeof this.data.pm2_5 === "number") {
