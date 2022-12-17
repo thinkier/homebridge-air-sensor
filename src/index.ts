@@ -1,6 +1,6 @@
 import {
     AccessoryPlugin,
-    API,
+    API, Characteristic,
     CharacteristicEventTypes,
     CharacteristicGetCallback,
     HAP,
@@ -17,6 +17,8 @@ interface SensorReport {
     temperature?: number,
     humidity?: number,
     air_quality?: number,
+    pm10?: number;
+    pm2_5?: number;
     voc_ppm?: number,
     co_detected?: boolean
     co_ppm?: number,
@@ -246,7 +248,20 @@ class AirQualitySensor implements AccessoryPlugin {
             if (this.data.air_quality) {
                 this.airQualityService.updateCharacteristic(hap.Characteristic.AirQuality, this.data.air_quality);
             }
-            if (this.data.voc_ppm && config.features.voc) {
+
+            if (config.features.pm10 && typeof this.data.pm10 === "number") {
+                this.airQualityService.updateCharacteristic(hap.Characteristic.PM10Density, this.data.pm10);
+
+                if (!this.data.air_quality) {
+                    this.airQualityService.updateCharacteristic(hap.Characteristic.AirQuality, pm10ToAqi(this.data.pm10));
+                }
+            }
+
+            if (config.features.pm2_5 && typeof this.data.pm2_5 === "number") {
+                this.airQualityService.updateCharacteristic(hap.Characteristic.PM2_5Density, this.data.pm2_5);
+            }
+
+            if (config.features.voc && typeof this.data.voc_ppm === "number") {
                 this.airQualityService.updateCharacteristic(hap.Characteristic.VOCDensity, this.data.voc_ppm);
             }
         }
@@ -301,4 +316,18 @@ class AirQualitySensor implements AccessoryPlugin {
             hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_ABNORMAL :
             hap.Characteristic.CarbonDioxideDetected.CO2_LEVELS_NORMAL
     }
+}
+
+// EU CAQI: https://en.wikipedia.org/wiki/Air_quality_index#CAQI
+function pm10ToAqi(pm10_ugm: number) {
+    if (pm10_ugm <= 25) {
+        return hap.Characteristic.AirQuality.EXCELLENT;
+    } else if (pm10_ugm <= 50) {
+        return hap.Characteristic.AirQuality.GOOD;
+    } else if (pm10_ugm <= 75) {
+        return hap.Characteristic.AirQuality.FAIR;
+    } else if (pm10_ugm <= 100) {
+        return hap.Characteristic.AirQuality.INFERIOR;
+    }
+    return hap.Characteristic.AirQuality.POOR;
 }

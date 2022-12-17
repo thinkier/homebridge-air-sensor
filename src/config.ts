@@ -7,6 +7,8 @@ export interface Config extends AccessoryConfig {
         temperature?: boolean,
         humidity?: boolean,
         aqi?: boolean,
+        pm10?: boolean,
+        pm2_5?: boolean,
         voc?: boolean,
         co?: boolean,
         co_ppm?: boolean,

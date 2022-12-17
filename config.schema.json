@@ -47,6 +47,22 @@
             "functionBody": "return model.features.aqi === true;"
           }
         },
+        "pm10": {
+          "title": "Particulate Matter PM10 (μg/m³)",
+          "type": "boolean",
+          "default": "false",
+          "condition": {
+            "functionBody": "return model.features.aqi === true;"
+          }
+        },
+        "pm2_5": {
+          "title": "Particulate Matter PM2.5 (μg/m³)",
+          "type": "boolean",
+          "default": "false",
+          "condition": {
+            "functionBody": "return model.features.aqi === true;"
+          }
+        },
         "co": {
           "title": "Carbon Monoxide Detection",
           "type": "boolean",
